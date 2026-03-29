@@ -10,20 +10,29 @@ A dashboard that finds trending TikTok videos and lets you recreate them with AI
 
 ## Features
 
-- **40+ trending videos** across AI Viral, Satisfying, Tech Gadgets, and AI Generated categories
-- **Filter and sort** by category, play count, likes, shares, or recency
+- **Search any niche** — type "fitness", "cooking", "real estate" or click a preset niche button
+- **Customizable niche buttons** — configure your own in Settings
+- **Star/save videos** — persists to disk via `server.js` or localStorage as fallback
+- **Filter and sort** by niche, play count, likes, shares, or recency
 - **Embedded TikTok previews** — first 6 auto-load, rest lazy-load on scroll
 - **"Remake in Pollo" button** — copies the TikTok URL to clipboard and opens [Pollo AI Agent](https://pollo.ai/app/ai-agent) so you can recreate the video with AI
 - **No TikTok account needed** — browse trends without the app
 
 ## Quick Start
 
+### Option A: Just open it (simplest)
 1. Clone the repo
 2. Open `dashboard.html` in your browser
 3. Browse trending videos
-4. Click **"Remake in Pollo"** on any video → paste the URL into Pollo's AI Agent → it analyzes and recreates the video
 
-That's it. The dashboard works as a standalone HTML file with no dependencies.
+### Option B: With persistent starred videos (recommended)
+1. Clone the repo
+2. Run `node server.js`
+3. Open `http://localhost:3000`
+
+Option B saves your starred videos to `stars.json` on disk, so they survive browser data clears. Zero dependencies — just Node.
+
+Both options work with the full feature set: search, star, filter, sort, and "Remake in Pollo".
 
 ## Refreshing the Data
 
@@ -65,8 +74,9 @@ Want the full implementation guide for building this pipeline from scratch, incl
 
 ## Tech Stack
 
-- **Frontend:** Single HTML file, vanilla JS, no dependencies
-- **Data:** [Apify](https://apify.com) TikTok scraper via [Claude Code](https://claude.ai/code) MCP
+- **Frontend:** Single HTML file, vanilla JS, no build step
+- **Server:** `server.js` — zero-dependency Node.js server for persistent stars
+- **Data:** [Apify](https://apify.com) TikTok scraper (free tier: ~30-50 searches/month)
 - **Video Generation:** [Pollo AI](https://pollo.ai)
 - **Video Embeds:** TikTok Player API
 
