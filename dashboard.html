@@ -268,21 +268,46 @@ function catClass(cat) {
   return 'cat-' + cat.toLowerCase().replace(/[^a-z0-9]/g, '-');
 }
 
-// Favorites
-function getFavorites() {
-  try { return JSON.parse(localStorage.getItem('favorites') || '[]'); } catch { return []; }
+// Favorites — saves to localStorage AND server-side stars.json
+let starredVideos = [];
+let starredIds = [];
+
+async function loadStars() {
+  // Try server first, fall back to localStorage
+  try {
+    const resp = await fetch('/api/stars');
+    if (resp.ok) {
+      starredVideos = await resp.json();
+      starredIds = starredVideos.map(v => v.id);
+      localStorage.setItem('favorite_ids', JSON.stringify(starredIds));
+      localStorage.setItem('favorite_videos', JSON.stringify(starredVideos));
+      return;
+    }
+  } catch {}
+  // Fallback to localStorage (works when opened as plain HTML file)
+  try { starredIds = JSON.parse(localStorage.getItem('favorite_ids') || '[]'); } catch { starredIds = []; }
+  try { starredVideos = JSON.parse(localStorage.getItem('favorite_videos') || '[]'); } catch { starredVideos = []; }
 }
-function isFavorite(id) { return getFavorites().includes(id); }
-function toggleFavorite(id, btn) {
-  let favs = getFavorites();
-  if (favs.includes(id)) {
-    favs = favs.filter(f => f !== id);
+
+function getFavoriteVideos() { return starredVideos; }
+function isFavorite(id) { return starredIds.includes(id); }
+
+async function toggleFavorite(id, btn) {
+  if (starredIds.includes(id)) {
+    starredIds = starredIds.filter(f => f !== id);
+    starredVideos = starredVideos.filter(v => v.id !== id);
     btn.classList.remove('starred');
   } else {
-    favs.push(id);
+    starredIds.push(id);
+    const video = currentVideos.find(v => v.id === id);
+    if (video) starredVideos.push(video);
     btn.classList.add('starred');
   }
-  localStorage.setItem('favorites', JSON.stringify(favs));
+  // Save to localStorage always
+  localStorage.setItem('favorite_ids', JSON.stringify(starredIds));
+  localStorage.setItem('favorite_videos', JSON.stringify(starredVideos));
+  // Save to server (fire and forget — works when server is running, silent fail otherwise)
+  try { fetch('/api/stars', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(starredVideos) }); } catch {}
 }
 
 // Home button
@@ -378,8 +403,7 @@ function renderCards(filter, sort) {
   let filtered;
   if (filter === 'all') filtered = [...currentVideos];
   else if (filter === 'favorites') {
-    const favs = getFavorites();
-    filtered = currentVideos.filter(v => favs.includes(v.id));
+    filtered = getFavoriteVideos();
     if (filtered.length === 0) {
       grid.innerHTML = '<div class="empty">No starred videos yet — click the star on any video to save it here</div>';
       return;
@@ -597,9 +621,12 @@ document.getElementById('niche-input').addEventListener('keydown', (e) => {
 
 // Initial render with bundled data
 let currentVideos = [...videos];
-buildFilterButtons();
-renderCards('all', 'plays');
-setupLazyLoad();
+(async () => {
+  await loadStars();
+  buildFilterButtons();
+  renderCards('all', 'plays');
+  setupLazyLoad();
+})();
 </script>
 
 </body>
