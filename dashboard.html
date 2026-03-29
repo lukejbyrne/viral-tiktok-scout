@@ -18,9 +18,51 @@
   .header h1 { font-size: 1.8em; color: #fff; margin-bottom: 4px; }
   .header p { color: #666; font-size: 0.9em; }
 
+  /* Search */
+  .search-row {
+    display: flex; gap: 8px; margin-top: 16px; align-items: center;
+  }
+  #niche-input {
+    flex: 1; padding: 10px 16px; border-radius: 10px; border: 1px solid #333;
+    background: #111; color: #fff; font-size: 0.95em; outline: none;
+    transition: border-color 0.2s;
+  }
+  #niche-input:focus { border-color: #3b82f6; }
+  #niche-input::placeholder { color: #444; }
+  #search-btn {
+    padding: 10px 20px; border-radius: 10px; border: none;
+    background: #3b82f6; color: #fff; font-weight: 600; font-size: 0.85em;
+    cursor: pointer; transition: background 0.2s; white-space: nowrap;
+  }
+  #search-btn:hover { background: #2563eb; }
+  #search-btn:disabled { background: #1e3a5f; color: #666; cursor: not-allowed; }
+  #settings-btn {
+    padding: 10px 16px; border-radius: 10px; border: 1px solid #333;
+    background: transparent; color: #666; font-size: 0.85em; cursor: pointer;
+    transition: all 0.2s; white-space: nowrap;
+  }
+  #settings-btn:hover { border-color: #555; color: #999; }
+
+  .settings-panel {
+    display: none; margin-top: 12px; padding: 16px; background: #0d0d0d;
+    border: 1px solid #222; border-radius: 10px;
+  }
+  .settings-panel.open { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .settings-panel label { font-size: 0.8em; color: #888; margin-right: 4px; }
+  .settings-panel input {
+    flex: 1; min-width: 200px; padding: 8px 12px; border-radius: 8px;
+    border: 1px solid #333; background: #111; color: #fff; font-size: 0.85em;
+    font-family: monospace;
+  }
+  .settings-panel button {
+    padding: 8px 16px; border-radius: 8px; border: none;
+    background: #22c55e; color: #000; font-weight: 600; font-size: 0.8em; cursor: pointer;
+  }
+  #token-status { font-size: 0.8em; color: #22c55e; }
+
   /* Filters */
   .filters {
-    display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; align-items: center;
+    display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; align-items: center;
   }
   .filter-btn {
     padding: 6px 16px; border-radius: 20px; border: 1px solid #333;
@@ -133,13 +175,20 @@
 
 <div class="header">
   <h1>Viral TikTok Scout</h1>
-  <p>40 trending videos across 4 categories — click to preview, copy URL for Pollo</p>
-  <div class="filters">
+  <p id="subtitle">Browse trending videos — search your niche, preview inline, remake with AI</p>
+  <div class="search-row">
+    <input type="text" id="niche-input" placeholder="Search a niche... e.g. fitness, cooking, real estate" />
+    <button id="search-btn" onclick="searchNiche()">Search TikTok</button>
+    <button id="settings-btn" onclick="toggleSettings()">Settings</button>
+  </div>
+  <div class="settings-panel" id="settings-panel">
+    <label>Apify API Token <span style="color:#555">(get one free at apify.com)</span></label>
+    <input type="password" id="apify-token" placeholder="apify_api_XXXXX" />
+    <button onclick="saveToken()">Save Token</button>
+    <span id="token-status"></span>
+  </div>
+  <div class="filters" id="filters-row">
     <button class="filter-btn active" data-filter="all">All</button>
-    <button class="filter-btn" data-filter="AI Viral">AI Viral</button>
-    <button class="filter-btn" data-filter="Satisfying">Satisfying</button>
-    <button class="filter-btn" data-filter="Tech Gadgets">Tech Gadgets</button>
-    <button class="filter-btn" data-filter="AI Generated">AI Generated</button>
     <select class="sort-select" id="sort-select">
       <option value="plays">Most Played</option>
       <option value="likes">Most Liked</option>
@@ -167,17 +216,66 @@ function formatDuration(s) {
   return m + ':' + sec.toString().padStart(2,'0');
 }
 
+// Dynamic category colors
+const catColors = {};
+const colorPool = [
+  { bg: '#1a1030', fg: '#a78bfa' },
+  { bg: '#102010', fg: '#86efac' },
+  { bg: '#101828', fg: '#7dd3fc' },
+  { bg: '#201818', fg: '#fca5a5' },
+  { bg: '#1a1a10', fg: '#fcd34d' },
+  { bg: '#101a1a', fg: '#67e8f9' },
+  { bg: '#1a100a', fg: '#fdba74' },
+  { bg: '#1a0a1a', fg: '#f0abfc' },
+];
+let colorIndex = 0;
+
 function catClass(cat) {
-  if (cat === 'AI Viral') return 'cat-ai';
-  if (cat === 'Satisfying') return 'cat-satisfying';
-  if (cat === 'Tech Gadgets') return 'cat-tech';
-  if (cat === 'AI Generated') return 'cat-generated';
-  return '';
+  if (!catColors[cat]) {
+    const c = colorPool[colorIndex % colorPool.length];
+    catColors[cat] = c;
+    colorIndex++;
+    // Inject a dynamic CSS rule
+    const style = document.createElement('style');
+    const cls = 'cat-' + cat.toLowerCase().replace(/[^a-z0-9]/g, '-');
+    style.textContent = `.${cls} { background: ${c.bg}; color: ${c.fg}; }`;
+    document.head.appendChild(style);
+  }
+  return 'cat-' + cat.toLowerCase().replace(/[^a-z0-9]/g, '-');
+}
+
+function buildFilterButtons() {
+  const cats = [...new Set(currentVideos.map(v => v.category))];
+  const row = document.getElementById('filters-row');
+  const sortEl = document.getElementById('sort-select');
+  row.innerHTML = '';
+  const allBtn = document.createElement('button');
+  allBtn.className = 'filter-btn active';
+  allBtn.dataset.filter = 'all';
+  allBtn.textContent = 'All';
+  row.appendChild(allBtn);
+  cats.forEach(cat => {
+    const btn = document.createElement('button');
+    btn.className = 'filter-btn';
+    btn.dataset.filter = cat;
+    btn.textContent = cat;
+    row.appendChild(btn);
+  });
+  row.appendChild(sortEl);
+  // Re-bind click handlers
+  row.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      row.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderCards(btn.dataset.filter, document.getElementById('sort-select').value);
+      setupLazyLoad();
+    });
+  });
 }
 
 function renderCards(filter, sort) {
   const grid = document.getElementById('grid');
-  let filtered = filter === 'all' ? [...videos] : videos.filter(v => v.category === filter);
+  let filtered = filter === 'all' ? [...currentVideos] : currentVideos.filter(v => v.category === filter);
 
   if (sort === 'plays') filtered.sort((a,b) => b.playCount - a.playCount);
   else if (sort === 'likes') filtered.sort((a,b) => b.diggCount - a.diggCount);
@@ -245,16 +343,6 @@ function copyUrl(url, btn) {
   });
 }
 
-// Filter buttons
-document.querySelectorAll('.filter-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    renderCards(btn.dataset.filter, document.getElementById('sort-select').value);
-    setupLazyLoad();
-  });
-});
-
 // Sort
 document.getElementById('sort-select').addEventListener('change', (e) => {
   const activeFilter = document.querySelector('.filter-btn.active').dataset.filter;
@@ -282,7 +370,123 @@ function setupLazyLoad() {
   });
 }
 
-// Initial render
+// Settings panel
+function toggleSettings() {
+  document.getElementById('settings-panel').classList.toggle('open');
+}
+
+function saveToken() {
+  const token = document.getElementById('apify-token').value.trim();
+  if (token) {
+    localStorage.setItem('apify_token', token);
+    document.getElementById('token-status').textContent = 'Saved!';
+    setTimeout(() => { document.getElementById('token-status').textContent = ''; }, 2000);
+  }
+}
+
+// Load saved token on start
+(function() {
+  const saved = localStorage.getItem('apify_token');
+  if (saved) document.getElementById('apify-token').value = saved;
+})();
+
+// Search niche via Apify
+async function searchNiche() {
+  const query = document.getElementById('niche-input').value.trim();
+  if (!query) return;
+
+  const token = localStorage.getItem('apify_token');
+  if (!token) {
+    toggleSettings();
+    document.getElementById('token-status').textContent = 'Enter your Apify token first';
+    document.getElementById('token-status').style.color = '#ef4444';
+    setTimeout(() => { document.getElementById('token-status').textContent = ''; document.getElementById('token-status').style.color = '#22c55e'; }, 3000);
+    return;
+  }
+
+  const btn = document.getElementById('search-btn');
+  btn.disabled = true;
+  btn.textContent = 'Searching...';
+  document.getElementById('subtitle').textContent = `Searching TikTok for "${query}"...`;
+
+  try {
+    // Start the scraper run
+    const runResp = await fetch(
+      `https://api.apify.com/v2/acts/clockworks~tiktok-scraper/runs?token=${token}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          searchQueries: [query],
+          resultsPerPage: 20,
+          shouldDownloadCovers: false,
+          shouldDownloadSlideshowImages: false,
+          shouldDownloadSubtitles: false,
+          shouldDownloadVideos: false
+        })
+      }
+    );
+    const runData = await runResp.json();
+    const datasetId = runData.data?.defaultDatasetId;
+
+    if (!datasetId) throw new Error('No dataset returned');
+
+    // Poll for results (Apify runs take 15-45 seconds)
+    btn.textContent = 'Scraping TikTok...';
+    let items = [];
+    for (let attempt = 0; attempt < 20; attempt++) {
+      await new Promise(r => setTimeout(r, 3000));
+      const itemsResp = await fetch(
+        `https://api.apify.com/v2/datasets/${datasetId}/items?token=${token}&limit=20&format=json`
+      );
+      items = await itemsResp.json();
+      if (items.length > 0) break;
+      btn.textContent = `Scraping TikTok... (${(attempt+1)*3}s)`;
+    }
+
+    if (items.length === 0) throw new Error('No results found');
+
+    // Transform to our format
+    const niceName = query.charAt(0).toUpperCase() + query.slice(1);
+    const newVideos = items.map(item => ({
+      id: item.id || '',
+      category: niceName,
+      text: (item.text || '').slice(0, 200),
+      playCount: item.playCount || 0,
+      diggCount: item.diggCount || 0,
+      shareCount: item.shareCount || 0,
+      commentCount: item.commentCount || 0,
+      url: item.webVideoUrl || '',
+      author: item.authorMeta?.name || '',
+      authorNickname: item.authorMeta?.nickName || '',
+      coverUrl: '',
+      createTimeISO: item.createTimeISO || '',
+      duration: item.videoMeta?.duration || 0,
+    })).filter(v => v.id && v.url);
+
+    // Replace current videos with search results
+    currentVideos = newVideos;
+    buildFilterButtons();
+    renderCards('all', 'plays');
+    setupLazyLoad();
+    document.getElementById('subtitle').textContent = `${newVideos.length} videos found for "${query}"`;
+
+  } catch (err) {
+    document.getElementById('subtitle').textContent = `Error: ${err.message}`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Search TikTok';
+  }
+}
+
+// Enter key triggers search
+document.getElementById('niche-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') searchNiche();
+});
+
+// Initial render with bundled data
+let currentVideos = [...videos];
+buildFilterButtons();
 renderCards('all', 'plays');
 setupLazyLoad();
 </script>
