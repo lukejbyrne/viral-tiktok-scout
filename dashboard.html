@@ -161,17 +161,6 @@
     z-index: 2;
   }
 
-  /* Niche suggestions */
-  .niche-row {
-    display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap;
-  }
-  .niche-btn {
-    padding: 4px 12px; border-radius: 16px; border: 1px solid #252525;
-    background: transparent; color: #666; cursor: pointer; font-size: 0.75em;
-    transition: all 0.2s;
-  }
-  .niche-btn:hover { border-color: #3b82f6; color: #3b82f6; }
-
   /* Star / Favorites */
   .star-btn {
     position: absolute; top: 8px; right: 8px; z-index: 3;
@@ -206,28 +195,24 @@
     <button id="settings-btn" onclick="toggleSettings()">Settings</button>
   </div>
   <div class="settings-panel" id="settings-panel">
-    <label>Apify API Token <span style="color:#555">(get one free at apify.com)</span></label>
-    <input type="password" id="apify-token" placeholder="apify_api_XXXXX" />
-    <button onclick="saveToken()">Save Token</button>
-    <span id="token-status"></span>
-  </div>
-  <div class="niche-row" id="niche-row">
-    <span style="color:#444; font-size:0.75em; margin-right:4px;">Try:</span>
-    <button class="niche-btn" onclick="quickSearch('health fitness')">Health & Fitness</button>
-    <button class="niche-btn" onclick="quickSearch('business entrepreneur')">Business</button>
-    <button class="niche-btn" onclick="quickSearch('cooking recipes')">Cooking</button>
-    <button class="niche-btn" onclick="quickSearch('real estate property')">Real Estate</button>
-    <button class="niche-btn" onclick="quickSearch('fashion style')">Fashion</button>
-    <button class="niche-btn" onclick="quickSearch('gaming')">Gaming</button>
-    <button class="niche-btn" onclick="quickSearch('beauty makeup')">Beauty</button>
-    <button class="niche-btn" onclick="quickSearch('travel adventure')">Travel</button>
-    <button class="niche-btn" onclick="quickSearch('finance investing money')">Finance</button>
-    <button class="niche-btn" onclick="quickSearch('pets dogs cats')">Pets</button>
-    <button class="niche-btn" onclick="quickSearch('comedy funny')">Comedy</button>
-    <button class="niche-btn" onclick="quickSearch('motivation self improvement')">Motivation</button>
+    <div style="width:100%; margin-bottom:10px;">
+      <label>Apify API Token <span style="color:#555">(get one free at apify.com)</span></label>
+      <div style="display:flex; gap:8px; margin-top:4px;">
+        <input type="password" id="apify-token" placeholder="apify_api_XXXXX" />
+        <button onclick="saveToken()">Save Token</button>
+        <span id="token-status"></span>
+      </div>
+    </div>
+    <div style="width:100%;">
+      <label>Quick Search Niches <span style="color:#555">(comma-separated)</span></label>
+      <div style="display:flex; gap:8px; margin-top:4px;">
+        <input type="text" id="niches-input" style="font-family:-apple-system,sans-serif;" placeholder="e.g. Fitness, Business, Cooking" />
+        <button onclick="saveNiches()">Save Niches</button>
+        <span id="niches-status"></span>
+      </div>
+    </div>
   </div>
   <div class="filters" id="filters-row">
-    <button class="filter-btn active" data-filter="all">All</button>
     <select class="sort-select" id="sort-select">
       <option value="plays">Most Played</option>
       <option value="likes">Most Liked</option>
@@ -310,48 +295,82 @@ function goHome() {
   setupLazyLoad();
 }
 
-// Quick search from niche buttons
+// Niche management
+const defaultNiches = ['Health & Fitness', 'Business', 'Cooking', 'Real Estate', 'Fashion', 'Gaming', 'Beauty', 'Travel', 'Finance', 'Pets', 'Comedy', 'Motivation'];
+
+function getNiches() {
+  try {
+    const saved = localStorage.getItem('niches');
+    return saved ? JSON.parse(saved) : defaultNiches;
+  } catch { return defaultNiches; }
+}
+
+function saveNiches() {
+  const val = document.getElementById('niches-input').value.trim();
+  if (val) {
+    const niches = val.split(',').map(s => s.trim()).filter(Boolean);
+    localStorage.setItem('niches', JSON.stringify(niches));
+    document.getElementById('niches-status').textContent = 'Saved!';
+    setTimeout(() => { document.getElementById('niches-status').textContent = ''; }, 2000);
+    buildFilterButtons();
+  }
+}
+
 function quickSearch(query) {
   document.getElementById('niche-input').value = query;
   searchNiche();
 }
 
 function buildFilterButtons() {
-  const cats = [...new Set(currentVideos.map(v => v.category))];
   const row = document.getElementById('filters-row');
   const sortEl = document.getElementById('sort-select');
   row.innerHTML = '';
-  // Favorites button
+
+  // Starred button
   const favBtn = document.createElement('button');
   favBtn.className = 'filter-btn';
   favBtn.dataset.filter = 'favorites';
   favBtn.textContent = 'Starred';
   favBtn.style.color = '#fcd34d';
   favBtn.style.borderColor = '#fcd34d33';
+  favBtn.addEventListener('click', () => {
+    row.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    favBtn.classList.add('active');
+    renderCards('favorites', document.getElementById('sort-select').value);
+    setupLazyLoad();
+  });
   row.appendChild(favBtn);
-  // All button
+
+  // All button (shows current loaded data)
   const allBtn = document.createElement('button');
   allBtn.className = 'filter-btn active';
   allBtn.dataset.filter = 'all';
   allBtn.textContent = 'All';
+  allBtn.addEventListener('click', () => {
+    row.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    allBtn.classList.add('active');
+    renderCards('all', document.getElementById('sort-select').value);
+    setupLazyLoad();
+  });
   row.appendChild(allBtn);
-  cats.forEach(cat => {
+
+  // Niche buttons (act as quick search triggers)
+  getNiches().forEach(niche => {
     const btn = document.createElement('button');
     btn.className = 'filter-btn';
-    btn.dataset.filter = cat;
-    btn.textContent = cat;
-    row.appendChild(btn);
-  });
-  row.appendChild(sortEl);
-  // Re-bind click handlers
-  row.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.textContent = niche;
     btn.addEventListener('click', () => {
       row.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      renderCards(btn.dataset.filter, document.getElementById('sort-select').value);
-      setupLazyLoad();
+      quickSearch(niche.toLowerCase());
     });
+    row.appendChild(btn);
   });
+
+  row.appendChild(sortEl);
+
+  // Load saved niches into settings input
+  document.getElementById('niches-input').value = getNiches().join(', ');
 }
 
 function renderCards(filter, sort) {
