@@ -145,9 +145,6 @@
     font-size: 0.75em; font-weight: 600; cursor: pointer; transition: all 0.2s;
     text-align: center; text-decoration: none; display: block;
   }
-  .btn-remake { background: linear-gradient(135deg, #1a2e1a, #102e20); color: #22c55e; border: 1px solid #22c55e33; }
-  .btn-remake:hover { background: linear-gradient(135deg, #203e20, #153e28); transform: scale(1.02); }
-  .btn-remake.clicked { background: #102010; color: #86efac; }
   .btn-copy { background: #1a1a2e; color: #a78bfa; }
   .btn-copy:hover { background: #252540; }
   .btn-copy.copied { background: #102010; color: #86efac; }
@@ -188,7 +185,7 @@
 
 <div class="header">
   <h1 onclick="goHome()">Viral TikTok Scout</h1>
-  <p id="subtitle">Browse trending videos — search your niche, preview inline, remake with AI</p>
+  <p id="subtitle">Browse trending videos — search your niche, preview inline, star your favorites</p>
   <div class="search-row">
     <input type="text" id="niche-input" placeholder="Search a niche... e.g. fitness, cooking, real estate" />
     <button id="search-btn" onclick="searchNiche()">Search TikTok</button>
@@ -314,7 +311,7 @@ async function toggleFavorite(id, btn) {
 function goHome() {
   currentVideos = [...videos];
   document.getElementById('niche-input').value = '';
-  document.getElementById('subtitle').textContent = 'Browse trending videos — search your niche, preview inline, remake with AI';
+  document.getElementById('subtitle').textContent = 'Browse trending videos — search your niche, preview inline, star your favorites';
   buildFilterButtons();
   renderCards('all', 'plays');
   setupLazyLoad();
@@ -447,7 +444,6 @@ function renderCards(filter, sort) {
           <div class="stat"><span class="stat-value">${formatNum(v.commentCount)}</span><span class="stat-label">Comments</span></div>
         </div>
         <div class="card-actions">
-          <button class="btn btn-remake" onclick="remakeInPollo('${v.url}', this)">Remake in Pollo</button>
           <button class="btn btn-copy" onclick="copyUrl('${v.url}', this)">Copy URL</button>
           <a class="btn btn-open" href="${v.url}" target="_blank" rel="noopener">TikTok</a>
         </div>
@@ -458,16 +454,14 @@ function renderCards(filter, sort) {
 
 function loadEmbed(videoId) {
   const container = document.getElementById('embed-' + videoId);
-  container.innerHTML = `<iframe src="https://www.tiktok.com/player/v1/${videoId}?autoplay=1&hide_share=1&hide_like=1&hide_comment=1&hide_music=1" allowfullscreen allow="autoplay; encrypted-media"></iframe>`;
-}
-
-function remakeInPollo(url, btn) {
-  navigator.clipboard.writeText(url).then(() => {
-    btn.textContent = 'URL Copied — Opening Pollo...';
-    btn.classList.add('clicked');
-    setTimeout(() => { btn.textContent = 'Remake in Pollo'; btn.classList.remove('clicked'); }, 3000);
-    window.open('https://pollo.ai/app/ai-agent', '_blank');
-  });
+  const placeholder = container.querySelector('.placeholder');
+  if (placeholder) {
+    const iframe = document.createElement('iframe');
+    iframe.src = `https://www.tiktok.com/player/v1/${videoId}?autoplay=1&hide_share=1&hide_like=1&hide_comment=1&hide_music=1`;
+    iframe.allowFullscreen = true;
+    iframe.allow = 'autoplay; encrypted-media';
+    placeholder.replaceWith(iframe);
+  }
 }
 
 function copyUrl(url, btn) {
@@ -492,8 +486,13 @@ function setupLazyLoad() {
       if (entry.isIntersecting) {
         const container = entry.target;
         const videoId = container.dataset.videoId;
-        if (container.querySelector('.placeholder')) {
-          container.innerHTML = `<iframe src="https://www.tiktok.com/player/v1/${videoId}?hide_share=1&hide_like=1&hide_comment=1&hide_music=1" allowfullscreen allow="encrypted-media"></iframe>`;
+        const placeholder = container.querySelector('.placeholder');
+        if (placeholder) {
+          const iframe = document.createElement('iframe');
+          iframe.src = `https://www.tiktok.com/player/v1/${videoId}?hide_share=1&hide_like=1&hide_comment=1&hide_music=1`;
+          iframe.allowFullscreen = true;
+          iframe.allow = 'encrypted-media';
+          placeholder.replaceWith(iframe);
         }
         observer.unobserve(container);
       }
